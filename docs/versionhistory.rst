@@ -6,6 +6,9 @@ This library adheres to
 
 **UNRELEASED**
 
+- Added reconition of wildcard imports from ``typing`` and ``typing_extensions`` in the
+  import hook/instrumenter
+  (`#489 <https://github.com/agronholm/typeguard/issues/489>`_; PR by @ShipitAndPray)
 - Fixed compatibility with Python 3.15
   (`#554 <https://github.com/agronholm/typeguard/pull/554>`_; PR by @hrnciar)
 - Fixed an assignment expression against an annotated name (``x: int``, then
