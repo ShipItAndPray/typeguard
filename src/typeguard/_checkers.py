@@ -12,6 +12,7 @@ from inspect import Parameter, isclass, isfunction
 from io import BufferedIOBase, IOBase, RawIOBase, TextIOBase
 from itertools import zip_longest
 from textwrap import indent
+from types import UnionType
 from typing import (
     IO,
     AbstractSet,
@@ -23,11 +24,11 @@ from typing import (
     ForwardRef,
     List,
     NewType,
-    Optional,
     Set,
     TextIO,
     Tuple,
     Type,
+    TypeGuard,
     TypeVar,
     Union,
 )
@@ -71,18 +72,14 @@ else:
         get_origin,
     )
 
-if sys.version_info >= (3, 10):
-    from importlib.metadata import entry_points
-    from typing import ParamSpec
-else:
-    from importlib_metadata import entry_points
-    from typing_extensions import ParamSpec
+from importlib.metadata import entry_points
+from typing import ParamSpec
 
 TypeCheckerCallable: TypeAlias = Callable[
     [Any, Any, Tuple[Any, ...], TypeCheckMemo], Any
 ]
 TypeCheckLookupCallback: TypeAlias = Callable[
-    [Any, Tuple[Any, ...], Tuple[Any, ...]], Optional[TypeCheckerCallable]
+    [Any, Tuple[Any, ...], Tuple[Any, ...]], TypeCheckerCallable | None
 ]
 
 checker_lookup_functions: list[TypeCheckLookupCallback] = []
@@ -451,7 +448,7 @@ def check_uniontype(
     memo: TypeCheckMemo,
 ) -> None:
     if not args:
-        return check_instance(value, types.UnionType, (), memo)
+        return check_instance(value, UnionType, (), memo)
 
     errors: dict[str, TypeCheckError] = {}
     try:
@@ -761,11 +758,11 @@ def check_signature_compatible(subject: type, protocol: type, attrname: str) -> 
         ]
 
         # Remove the "self" parameter from the protocol arguments to match
-        if protocol_type == "instance":
+        if protocol_type == "instance" and protocol_args:
             protocol_args.pop(0)
 
         # Remove the "self" parameter from the subject arguments to match
-        if subject_type == "instance":
+        if subject_type == "instance" and subject_args:
             subject_args.pop(0)
 
         for protocol_arg, subject_arg in zip_longest(protocol_args, subject_args):
@@ -838,8 +835,15 @@ def check_protocol(
     memo: TypeCheckMemo,
 ) -> None:
     origin_annotations = typing.get_type_hints(origin_type)
+    checking_class = isclass(value)
     for attrname in sorted(typing_extensions.get_protocol_members(origin_type)):
         if (annotation := origin_annotations.get(attrname)) is not None:
+            if checking_class and typing.get_origin(annotation) is not typing.ClassVar:
+                # a non-ClassVar annotation is an instance attribute (PEP 544) —
+                # a class object isn't expected to have it set, and type
+                # checkers accept that, so don't flag it as missing.
+                continue
+
             try:
                 subject_member = getattr(value, attrname)
             except AttributeError:
@@ -1034,7 +1038,9 @@ origin_type_checkers: dict[
     Tuple: check_tuple,
     type: check_class,
     Type: check_class,
+    TypeGuard: check_typeguard,
     Union: check_union,
+    UnionType: check_uniontype,
     # On some versions of Python, these may simply be re-exports from "typing",
     # but exactly which Python versions is subject to change.
     # It's best to err on the safe side and just always specify these.
@@ -1043,9 +1049,6 @@ origin_type_checkers: dict[
     typing_extensions.Self: check_self,
     typing_extensions.TypeGuard: check_typeguard,
 }
-if sys.version_info >= (3, 10):
-    origin_type_checkers[types.UnionType] = check_uniontype
-    origin_type_checkers[typing.TypeGuard] = check_typeguard
 
 if sys.version_info >= (3, 11):
     origin_type_checkers.update(

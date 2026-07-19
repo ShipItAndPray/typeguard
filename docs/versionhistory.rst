@@ -4,6 +4,27 @@ Version history
 This library adheres to
 `Semantic Versioning 2.0 <https://semver.org/#semantic-versioning-200>`_.
 
+**UNRELEASED**
+
+- Fixed compatibility with Python 3.15
+  (`#554 <https://github.com/agronholm/typeguard/pull/554>`_; PR by @hrnciar)
+- Fixed an assignment expression against an annotated name (``x: int``, then
+  ``if (x := ...)``) being instrumented as an unpacking target, which raised
+  ``TypeError`` for a non-iterable value and silently replaced an iterable value with
+  ``list(value)``
+  (`#557 <https://github.com/agronholm/typeguard/issues/557>`_)
+- Fixed false positive when checking a class against ``type[SomeProtocol]`` where the
+  protocol declares non-``ClassVar`` (instance) attributes; only ``ClassVar`` members
+  are now required on the class itself
+  (`#499 <https://github.com/agronholm/typeguard/issues/499>`_)
+- Dropped support for Python 3.9
+
+**4.5.2** (2026-05-14)
+
+- Fixed ``IndexError`` raised from ``check_signature_compatible`` when the subject
+  method has no positional parameters
+  (`#550 <https://github.com/agronholm/typeguard/issues/550>`_; PR by @HackedRico)
+
 **4.5.1** (2026-02-19)
 
 - Fixed iterable unpacking incorrectly calculating the cut-off offset of the item list
@@ -583,7 +604,7 @@ This library adheres to
 
 **1.2.2** (2016-08-23)
 
-- Fixed checking of homogenous Tuple declarations (``Tuple[bool, ...]``)
+- Fixed checking of homogeneous Tuple declarations (``Tuple[bool, ...]``)
 
 **1.2.1** (2016-06-29)
 
