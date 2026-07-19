@@ -62,6 +62,9 @@ from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, cast, overload
+from typing import __all__ as typing_all
+
+from typing_extensions import __all__ as typing_extensions_all
 
 PreliminaryNameTypePair: typing.TypeAlias = tuple[Constant, "expr | None"]
 NameTypePair: typing.TypeAlias = tuple[Constant, expr]
@@ -603,10 +606,19 @@ class TypeguardTransformer(NodeTransformer):
 
     def visit_ImportFrom(self, node: ImportFrom) -> ImportFrom:
         for name in node.names:
-            if name.name == "*" and node.module in {"typing", "typing_extensions"}:
-                self._memo.local_names.add("Literal")
-                self._memo.imported_names["Literal"] = f"{node.module}.Literal"
-            elif name.name != "*":
+            if name.name == "*":
+                match node.module:
+                    case "typing":
+                        imported_names = typing_all
+                    case "typing_extensions":
+                        imported_names = typing_extensions_all
+                    case _:
+                        continue
+
+                for item in imported_names:
+                    self._memo.local_names.add(item)
+                    self._memo.imported_names.setdefault(item, f"{node.module}.{item}")
+            else:
                 alias = name.asname or name.name
                 self._memo.local_names.add(alias)
                 self._memo.imported_names[alias] = f"{node.module}.{name.name}"
